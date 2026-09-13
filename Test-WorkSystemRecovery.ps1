@@ -11,6 +11,11 @@ Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1' -File | ForEach-Object 
     foreach ($error in @($parseErrors)) { $errors.Add("$($_.Name): $($error.Message)") }
 }
 
+$sshBootstrapPath = Join-Path $PSScriptRoot 'Enable-WorkSystemSsh.ps1'
+if (Select-String -LiteralPath $sshBootstrapPath -SimpleMatch '-AssociatedNetFirewallRule' -Quiet) {
+    $errors.Add('SSH bootstrap uses a NetSecurity parameter unavailable in Windows PowerShell 5.1.')
+}
+
 foreach ($file in 'README.md','DEPLOYMENT-GUIDE.md','backup-sources.example.json','backup-excludes.txt','foundation-excludes.txt','deployment-config.example.json') {
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file))) { $errors.Add("Missing $file") }
 }

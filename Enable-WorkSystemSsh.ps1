@@ -55,7 +55,11 @@ if (-not (Test-Path -LiteralPath $sshdPath)) {
 $service = Get-Service -Name sshd -ErrorAction Stop
 Set-Service -Name sshd -StartupType Automatic
 
-$firewallRuleName = 'OpenSSH-Server-In-TCP'
+$firewallRuleName = if ($Port -eq 22) {
+    'OpenSSH-Server-In-TCP'
+} else {
+    "WorkSystem-OpenSSH-Server-In-TCP-$Port"
+}
 $firewallRule = Get-NetFirewallRule -Name $firewallRuleName -ErrorAction SilentlyContinue
 if ($null -eq $firewallRule) {
     New-NetFirewallRule `
@@ -65,10 +69,10 @@ if ($null -eq $firewallRule) {
         -Direction Inbound `
         -Protocol TCP `
         -Action Allow `
+        -Profile Any `
         -LocalPort $Port | Out-Null
 } else {
     Set-NetFirewallRule -Name $firewallRuleName -Enabled True -Direction Inbound -Action Allow | Out-Null
-    Set-NetFirewallPortFilter -AssociatedNetFirewallRule $firewallRule -Protocol TCP -LocalPort $Port | Out-Null
 }
 
 $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
