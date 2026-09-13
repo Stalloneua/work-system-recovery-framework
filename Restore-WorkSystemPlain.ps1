@@ -12,7 +12,7 @@ $sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue | Select-Object -Ex
 if (-not $sevenZip) { $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
 if (-not (Test-Path -LiteralPath $sevenZip)) { throw '7-Zip is not installed.' }
 $remoteRoot = "${RemoteName}:$($RemotePath.Trim('/'))"
-$markerJson = & rclone cat "$remoteRoot/latest.json"
+$markerJson = & rclone cat "$remoteRoot/latest.json" --log-level ERROR
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read the plain backup marker.' }
 $marker = $markerJson | ConvertFrom-Json
 if ($marker.backup_mode -ne 'plain-rclone' -or $marker.layout -ne 'snapshot-archives' -or -not $marker.backup_id) {
@@ -27,7 +27,7 @@ New-Item -ItemType Directory -Force -Path $restoredDocuments,$downloadRoot | Out
 try {
     foreach ($entry in @($marker.archives)) {
         $archivePath = Join-Path $downloadRoot $entry.archive
-        & rclone copyto "$remoteRoot/$($entry.remote_path)" $archivePath --checksum
+        & rclone copyto "$remoteRoot/$($entry.remote_path)" $archivePath --checksum --log-level ERROR
         if ($LASTEXITCODE -ne 0) { throw "Cannot download $($entry.archive)" }
         $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
         if ($sha256 -ne $entry.sha256) { throw "SHA256 mismatch for $($entry.archive)" }

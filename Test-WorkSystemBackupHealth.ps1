@@ -11,7 +11,7 @@ if (-not (Test-Path -LiteralPath $configPath)) { throw 'Production backup is not
 $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
 if ($config.backup_mode -eq 'plain-rclone') {
     $remoteRoot = "{0}:{1}" -f $config.remote_name, $config.remote_path.Trim('/')
-    $json = & rclone cat "$remoteRoot/latest.json"
+    $json = & rclone cat "$remoteRoot/latest.json" --log-level ERROR
     if ($LASTEXITCODE -ne 0) { throw 'Cannot read the plain backup marker.' }
     $latest = $json | ConvertFrom-Json
     $age = [DateTimeOffset]::Now - [DateTimeOffset]$latest.created_at

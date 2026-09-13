@@ -22,7 +22,7 @@ foreach ($markerFile in $markers) {
     if (Test-Path -LiteralPath $localPath) {
         $currentMd5 = (Get-FileHash -Algorithm MD5 -LiteralPath $localPath).Hash.ToLowerInvariant()
         if ($currentMd5 -ne [string]$marker.md5) { continue }
-        $remoteLine = (& rclone md5sum ([string]$marker.remote_path) | Select-Object -First 1)
+        $remoteLine = (& rclone md5sum ([string]$marker.remote_path) --log-level ERROR | Select-Object -First 1)
         if ($LASTEXITCODE -ne 0 -or -not $remoteLine) { continue }
         $remoteMd5 = ($remoteLine -split '\s+')[0].ToLowerInvariant()
         if ($remoteMd5 -ne $currentMd5) { continue }

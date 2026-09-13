@@ -16,6 +16,17 @@ if (Select-String -LiteralPath $sshBootstrapPath -SimpleMatch '-AssociatedNetFir
     $errors.Add('SSH bootstrap uses a NetSecurity parameter unavailable in Windows PowerShell 5.1.')
 }
 
+Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1' -File | ForEach-Object {
+    $scriptName = $_.Name
+    $lineNumber = 0
+    Get-Content -LiteralPath $_.FullName | ForEach-Object {
+        $lineNumber++
+        if ($_ -match '&\s+rclone\s+' -and $_ -notmatch '--log-level\s+ERROR') {
+            $errors.Add("${scriptName}:$lineNumber executes rclone without --log-level ERROR.")
+        }
+    }
+}
+
 foreach ($file in 'README.md','DEPLOYMENT-GUIDE.md','backup-sources.example.json','backup-excludes.txt','foundation-excludes.txt','deployment-config.example.json') {
     if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file))) { $errors.Add("Missing $file") }
 }

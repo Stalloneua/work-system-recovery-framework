@@ -69,12 +69,12 @@ try {
         $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
         $md5 = (Get-FileHash -Algorithm MD5 -LiteralPath $archivePath).Hash.ToLowerInvariant()
         $remoteArchive = "$remoteRoot/snapshots/$stamp/archives/$archiveName"
-        & rclone copyto $archivePath $remoteArchive --checksum --retries 5 --low-level-retries 10
+        & rclone copyto $archivePath $remoteArchive --checksum --retries 5 --low-level-retries 10 --log-level ERROR
         if ($LASTEXITCODE -ne 0) { throw "Archive upload failed for $relative" }
         $remoteMd5 = $null
         for ($attempt = 0; $attempt -lt 5 -and $remoteMd5 -ne $md5; $attempt++) {
             Start-Sleep -Seconds 3
-            $remoteMd5Line = & rclone md5sum $remoteArchive 2>$null
+            $remoteMd5Line = & rclone md5sum $remoteArchive --log-level ERROR 2>$null
             if ($LASTEXITCODE -eq 0 -and $remoteMd5Line) { $remoteMd5 = ($remoteMd5Line -split '\s+')[0].ToLowerInvariant() }
         }
         if (-not $remoteMd5) { throw "Cannot verify remote archive $archiveName" }
@@ -104,13 +104,13 @@ try {
     }
     $manifestPath = Join-Path $snapshotRoot 'manifest.json'
     $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding utf8
-    & rclone copyto $manifestPath "$remoteRoot/snapshots/$stamp/manifest.json" --checksum --retries 5 --low-level-retries 10
+    & rclone copyto $manifestPath "$remoteRoot/snapshots/$stamp/manifest.json" --checksum --retries 5 --low-level-retries 10 --log-level ERROR
     if ($LASTEXITCODE -ne 0) { throw 'Failed to publish the snapshot manifest.' }
-    & rclone copyto $manifestPath "$remoteRoot/latest.json" --checksum --retries 5 --low-level-retries 10
+    & rclone copyto $manifestPath "$remoteRoot/latest.json" --checksum --retries 5 --low-level-retries 10 --log-level ERROR
     if ($LASTEXITCODE -ne 0) { throw 'Failed to publish the latest backup marker.' }
 
     if ($Check) {
-        $remoteManifest = & rclone cat "$remoteRoot/latest.json"
+        $remoteManifest = & rclone cat "$remoteRoot/latest.json" --log-level ERROR
         if ($LASTEXITCODE -ne 0) { throw 'Cannot read back the latest backup marker.' }
         $readback = $remoteManifest | ConvertFrom-Json
         if ($readback.backup_id -ne $stamp -or $readback.source_count -ne $entries.Count) {

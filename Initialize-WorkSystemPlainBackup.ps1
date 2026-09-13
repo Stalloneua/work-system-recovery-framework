@@ -17,14 +17,14 @@ if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) {
     throw 'rclone is not installed.'
 }
 
-$remotes = @(& rclone listremotes | ForEach-Object { $_.TrimEnd(':') })
+$remotes = @(& rclone listremotes --log-level ERROR | ForEach-Object { $_.TrimEnd(':') })
 if ($RemoteName -notin $remotes) {
     Write-Host "Create the Google Drive remote '$RemoteName'. Browser OAuth approval is required once."
-    & rclone config create $RemoteName drive config_is_local true
+    & rclone config create $RemoteName drive config_is_local true --log-level ERROR
     if ($LASTEXITCODE -ne 0) { throw 'rclone Google Drive configuration failed.' }
 }
 
-& rclone lsd "${RemoteName}:" | Out-Null
+& rclone lsd "${RemoteName}:" --log-level ERROR | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Cannot read Google Drive remote '$RemoteName'." }
 
 [ordered]@{
