@@ -1,6 +1,8 @@
 # Reinstallable dependencies and caches
 **/node_modules/**
 **/vendor/**
+**/.git/**
+**/.qa/**
 **/.venv/**
 **/venv/**
 **/__pycache__/**

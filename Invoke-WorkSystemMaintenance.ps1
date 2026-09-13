@@ -18,15 +18,20 @@ $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
 if ($config.backup_mode -eq 'plain-rclone') {
     $remoteRoot = "{0}:{1}" -f $config.remote_name, $config.remote_path.Trim('/')
     $cutoff = (Get-Date).AddDays(-$KeepPlainDays)
-    $directories = @(& rclone lsf "$remoteRoot/history" --dirs-only 2>$null)
-    if ($LASTEXITCODE -notin @(0,3)) { throw 'Cannot list plain backup history.' }
+    $latestId = $null
+    $latestJson = & rclone cat "$remoteRoot/latest.json" 2>$null
+    if ($LASTEXITCODE -eq 0 -and $latestJson) {
+        $latestId = ($latestJson | ConvertFrom-Json).backup_id
+    }
+    $directories = @(& rclone lsf "$remoteRoot/snapshots" --dirs-only 2>$null)
+    if ($LASTEXITCODE -notin @(0,3)) { throw 'Cannot list plain backup snapshots.' }
     $removed = [System.Collections.Generic.List[string]]::new()
     foreach ($directory in $directories) {
         $name = $directory.TrimEnd('/')
         $parsed = [datetime]::MinValue
-        if ([datetime]::TryParseExact($name, 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed) -and $parsed -lt $cutoff) {
-            & rclone purge "$remoteRoot/history/$name"
-            if ($LASTEXITCODE -ne 0) { throw "Cannot purge expired history $name" }
+        if ($name -ne $latestId -and [datetime]::TryParseExact($name, 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$parsed) -and $parsed -lt $cutoff) {
+            & rclone purge "$remoteRoot/snapshots/$name"
+            if ($LASTEXITCODE -ne 0) { throw "Cannot purge expired snapshot $name" }
             $removed.Add($name)
         }
     }

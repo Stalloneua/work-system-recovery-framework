@@ -19,11 +19,14 @@ if (-not $SkipPackages) {
         @{ Id = 'OpenAI.Codex'; Command = 'codex' },
         @{ Id = 'Obsidian.Obsidian'; Command = 'obsidian' },
         @{ Id = 'Syncthing.Syncthing'; Command = 'syncthing' },
+        @{ Id = '7zip.7zip'; Command = '7z'; Path = (Join-Path $env:ProgramFiles '7-Zip\7z.exe') },
         @{ Id = 'Rclone.Rclone'; Command = 'rclone' }
     )
     if ($BackupMode -eq 'Encrypted') { $packages += @{ Id = 'restic.restic'; Command = 'restic' } }
     foreach ($package in $packages) {
-        if (-not (Get-Command $package.Command -ErrorAction SilentlyContinue)) {
+        $installed = Get-Command $package.Command -ErrorAction SilentlyContinue
+        if (-not $installed -and $package.Path) { $installed = Test-Path -LiteralPath $package.Path }
+        if (-not $installed) {
             & winget install --id $package.Id --exact --accept-package-agreements --accept-source-agreements --silent
             if ($LASTEXITCODE -ne 0) { throw "Failed to install $($package.Id)." }
         }

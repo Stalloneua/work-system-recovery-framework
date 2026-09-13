@@ -8,36 +8,53 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) { throw 'rclone is not installed.' }
+$sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+if (-not $sevenZip) { $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
+if (-not (Test-Path -LiteralPath $sevenZip)) { throw '7-Zip is not installed.' }
 $remoteRoot = "${RemoteName}:$($RemotePath.Trim('/'))"
-
 $markerJson = & rclone cat "$remoteRoot/latest.json"
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read the plain backup marker.' }
 $marker = $markerJson | ConvertFrom-Json
-if ($marker.backup_mode -ne 'plain-rclone' -or -not $marker.backup_id) { throw 'Invalid plain backup marker.' }
+if ($marker.backup_mode -ne 'plain-rclone' -or $marker.layout -ne 'snapshot-archives' -or -not $marker.backup_id) {
+    throw 'Invalid or unsupported plain backup marker.'
+}
 
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
 $restoredDocuments = Join-Path $Target 'Documents'
-New-Item -ItemType Directory -Force -Path $restoredDocuments | Out-Null
-& rclone copy "$remoteRoot/current/Documents" $restoredDocuments --checksum --metadata --create-empty-src-dirs
-if ($LASTEXITCODE -ne 0) { throw 'Plain Google Drive restore failed.' }
+$downloadRoot = Join-Path $Target '.archives'
+New-Item -ItemType Directory -Force -Path $restoredDocuments,$downloadRoot | Out-Null
 
-$vault = Get-ChildItem -LiteralPath $Target -Filter 'Work Management System.md' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
-$architecture = Get-ChildItem -LiteralPath $Target -Filter 'Cross-machine Continuity and One-command Recovery Architecture.md' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $vault -or -not $architecture) { throw 'Recovery validation failed: required operating notes are missing.' }
+try {
+    foreach ($entry in @($marker.archives)) {
+        $archivePath = Join-Path $downloadRoot $entry.archive
+        & rclone copyto "$remoteRoot/$($entry.remote_path)" $archivePath --checksum
+        if ($LASTEXITCODE -ne 0) { throw "Cannot download $($entry.archive)" }
+        $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
+        if ($sha256 -ne $entry.sha256) { throw "SHA256 mismatch for $($entry.archive)" }
+        & $sevenZip x $archivePath "-o$restoredDocuments" -y
+        if ($LASTEXITCODE -ne 0) { throw "Cannot extract $($entry.archive)" }
+    }
 
-if ($Apply) {
-    $documents = [Environment]::GetFolderPath('MyDocuments')
-    & robocopy $restoredDocuments $documents /E /COPY:DAT /DCOPY:DAT /R:2 /W:2 /XJ
-    if ($LASTEXITCODE -ge 8) { throw "robocopy apply failed with exit code $LASTEXITCODE" }
+    $vault = Get-ChildItem -LiteralPath $Target -Filter 'Work Management System.md' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    $architecture = Get-ChildItem -LiteralPath $Target -Filter 'Cross-machine Continuity and One-command Recovery Architecture.md' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $vault -or -not $architecture) { throw 'Recovery validation failed: required operating notes are missing.' }
+
+    if ($Apply) {
+        $documents = [Environment]::GetFolderPath('MyDocuments')
+        & robocopy $restoredDocuments $documents /E /COPY:DAT /DCOPY:DAT /R:2 /W:2 /XJ
+        if ($LASTEXITCODE -ge 8) { throw "robocopy apply failed with exit code $LASTEXITCODE" }
+    }
+
+    [ordered]@{
+        checked_at = (Get-Date).ToString('o')
+        backup_mode = 'plain-rclone'
+        layout = 'snapshot-archives'
+        backup_id = $marker.backup_id
+        target = $Target
+        applied = [bool]$Apply
+        result = 'PASS'
+    } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Target 'restore-result.json') -Encoding utf8
+    Write-Output "Plain restore verified at $Target from backup $($marker.backup_id)"
+} finally {
+    if (Test-Path -LiteralPath $downloadRoot) { Remove-Item -LiteralPath $downloadRoot -Recurse -Force }
 }
-
-[ordered]@{
-    checked_at = (Get-Date).ToString('o')
-    backup_mode = 'plain-rclone'
-    backup_id = $marker.backup_id
-    target = $Target
-    applied = [bool]$Apply
-    result = 'PASS'
-} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Target 'restore-result.json') -Encoding utf8
-
-Write-Output "Plain restore verified at $Target from backup $($marker.backup_id)"

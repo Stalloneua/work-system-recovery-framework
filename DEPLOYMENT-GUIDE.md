@@ -20,7 +20,7 @@ The target outcome is one technical command plus unavoidable secure account conf
 
 ## Backup modes and security model
 
-- `Plain` stores readable files under `Work System/00 Recovery/plain-foundation/current`, changed or deleted files under timestamped `history`, and verified completion markers under `manifests`. There is no separate recovery passphrase.
+- `Plain` stores unencrypted per-source ZIP snapshots under `Work System/00 Recovery/plain-foundation/snapshots/<timestamp>/archives`, a SHA-256/MD5 manifest, and a verified `latest.json` pointer. This avoids the Drive API cost of creating thousands of individual backup objects. There is no separate recovery passphrase; ordinary ZIP extraction is sufficient after download.
 - Google protects `Plain` data in transit and at rest, but any account with Drive access can read it. Use least-privilege sharing and MFA.
 - `Encrypted` uses restic. Its passphrase is never stored in Git, Obsidian, the tracker or a Drive document. The scheduled task receives a Windows DPAPI-encrypted local copy, and an independent recovery copy must exist in a password manager.
 - OAuth tokens stay in the local rclone configuration and are recreated by sign-in on a replacement machine.
