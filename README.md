@@ -18,6 +18,14 @@
 
 ## Відновлення на чистій машині
 
+Після завантаження і перевірки pinned release виконайте одну команду з розпакованого каталогу:
+
+```cmd
+Install-WorkSystem.cmd
+```
+
+Це one-command launcher. Google OAuth/MFA, вхід у Codex, підтвердження Syncthing device і незалежно збережений restic passphrase залишаються обов'язковими безпечними prompt.
+
 ```powershell
 .\bootstrap.ps1 -Repository "rclone:work-drive:Work System/00 Recovery/restic-foundation" -Apply
 ```

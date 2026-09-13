@@ -63,6 +63,14 @@ The deployment is accepted only when all three checks pass and a clean-directory
 
 Prerequisites: Windows, network access, the repository path and the independently stored restic passphrase.
 
+After downloading and verifying the pinned release package, run one command from its extracted directory:
+
+```cmd
+Install-WorkSystem.cmd
+```
+
+The launcher calls the pinned `bootstrap.ps1` with the canonical Google Drive restic repository. Account sign-ins, MFA, Syncthing device approval and the independently stored passphrase are secure confirmations, not extra deployment commands.
+
 From the framework directory run:
 
 ```powershell
