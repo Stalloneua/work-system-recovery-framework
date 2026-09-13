@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "organization": "Example organization",
+  "remote_name": "work-drive",
+  "drive_root": "Work System",
+  "repository": "rclone:work-drive:Work System/00 Recovery/restic-foundation",
+  "profile": "Foundation",
+  "backup_time": "02:00",
+  "cleanup_time": "03:00",
+  "health_time": "06:00",
+  "maintenance_day": "Sunday",
+  "maintenance_time": "04:00",
+  "scratch_retention_days": 7,
+  "snapshot_retention": {
+    "daily": 14,
+    "weekly": 8,
+    "monthly": 12
+  },
+  "secret_policy": "Recovery passphrase must be stored outside the machine and outside the repository."
+}

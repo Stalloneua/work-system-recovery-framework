@@ -1,0 +1,17 @@
+.qa/
+dist/
+chat-organization-manifest.json
+chatgpt-projects.json
+sidebar-state.json
+drive-layout.json
+foundation-profile-measurement.json
+backup-sources.json
+package-manifest.json
+*.xml
+*.log
+*.sqlite*
+*.jsonl
+local-config/
+foundation-excludes.local.txt
+backup-excludes.local.txt
+restore-tests/

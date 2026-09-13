@@ -1,0 +1,15 @@
+{
+  "critical": [
+    "%DOCUMENTS%\\Obsidian Vault",
+    "%DOCUMENTS%\\Codex\\work-system-recovery"
+  ],
+  "foundation": [
+    "%DOCUMENTS%\\Obsidian Vault",
+    "%DOCUMENTS%\\Company",
+    "%DOCUMENTS%\\Projects",
+    "%DOCUMENTS%\\Codex\\work-system-recovery"
+  ],
+  "full": [
+    "%DOCUMENTS%"
+  ]
+}

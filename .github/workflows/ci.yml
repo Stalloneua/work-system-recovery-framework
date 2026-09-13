@@ -1,0 +1,27 @@
+name: recovery-framework-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  powershell:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts and package contract
+        shell: powershell
+        run: .\Test-WorkSystemRecovery.ps1 -SkipRepository
+      - name: Verify no private runtime files are tracked
+        shell: powershell
+        run: |
+          $forbidden = @(
+            'backup-sources.json',
+            'chat-organization-manifest.json',
+            'chatgpt-projects.json',
+            'sidebar-state.json',
+            'drive-layout.json'
+          )
+          foreach ($name in $forbidden) {
+            if (Test-Path -LiteralPath $name) { throw "Private runtime file is tracked: $name" }
+          }
