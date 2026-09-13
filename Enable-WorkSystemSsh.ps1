@@ -55,11 +55,7 @@ if (-not (Test-Path -LiteralPath $sshdPath)) {
 $service = Get-Service -Name sshd -ErrorAction Stop
 Set-Service -Name sshd -StartupType Automatic
 
-$firewallRuleName = if ($Port -eq 22) {
-    'OpenSSH-Server-In-TCP'
-} else {
-    "WorkSystem-OpenSSH-Server-In-TCP-$Port"
-}
+$firewallRuleName = "WorkSystem-OpenSSH-Server-In-TCP-$Port"
 $firewallRule = Get-NetFirewallRule -Name $firewallRuleName -ErrorAction SilentlyContinue
 if ($null -eq $firewallRule) {
     New-NetFirewallRule `
@@ -72,7 +68,7 @@ if ($null -eq $firewallRule) {
         -Profile Any `
         -LocalPort $Port | Out-Null
 } else {
-    Set-NetFirewallRule -Name $firewallRuleName -Enabled True -Direction Inbound -Action Allow | Out-Null
+    Set-NetFirewallRule -Name $firewallRuleName -Enabled True -Direction Inbound -Action Allow -Profile Any | Out-Null
 }
 
 $currentIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -165,6 +161,16 @@ $result = [ordered]@{
     sshPort = $Port
     sshdState = (Get-Service -Name sshd).Status.ToString()
     firewallRule = $firewallRuleName
+    firewallRuleProfiles = (Get-NetFirewallRule -Name $firewallRuleName).Profile.ToString()
+    activeNetworkProfiles = @(
+        Get-NetConnectionProfile | ForEach-Object {
+            [ordered]@{
+                interfaceAlias = $_.InterfaceAlias
+                networkCategory = $_.NetworkCategory.ToString()
+                ipv4Connectivity = $_.IPv4Connectivity.ToString()
+            }
+        }
+    )
     authorizedKeysPath = $authorizedKeysPath
     sshdConfigTest = 'passed'
     localPortTest = $localPortOpen
