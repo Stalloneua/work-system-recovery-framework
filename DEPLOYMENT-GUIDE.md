@@ -50,6 +50,16 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 The deployment is accepted only when all three checks pass and a clean-directory restore contains the operating notes, direction register and chat manifest.
 
+## Optional remote Windows host bootstrap
+
+To make a Windows workstation manageable from Codex without exposing credentials, generate an ED25519 key on the controlling machine and run the following from the framework directory on the target:
+
+```cmd
+set "WORKSYSTEM_SSH_PUBLIC_KEY=ssh-ed25519 AAAA..." && Enable-WorkSystemSsh.cmd
+```
+
+The launcher requests Administrator elevation, installs Windows OpenSSH Server if needed, starts `sshd` automatically, enables inbound TCP 22, appends the key to the correct administrator or user key store, applies restrictive ACLs and returns a JSON verification report. Prefer a private Tailscale address for machines on different networks; do not expose TCP 22 through the public router. Keep password authentication available until a real external key login has passed.
+
 ## Scheduled operation
 
 | Task | Default | Result |
