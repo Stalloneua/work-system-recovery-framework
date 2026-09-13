@@ -12,11 +12,18 @@ $passwordPath = Join-Path $stateRoot 'restic-password.xml'
 $logRoot = Join-Path $stateRoot 'logs'
 New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
 
-if (-not (Test-Path -LiteralPath $configPath) -or -not (Test-Path -LiteralPath $passwordPath)) {
+if (-not (Test-Path -LiteralPath $configPath)) {
     throw 'Backup is not initialized. Run Initialize-WorkSystemBackup.ps1 first.'
 }
 
 $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
+if ($config.backup_mode -eq 'plain-rclone') {
+    & "$PSScriptRoot\Invoke-WorkSystemPlainBackup.ps1" -Profile $Profile -Check:$Check
+    exit $LASTEXITCODE
+}
+if (-not (Test-Path -LiteralPath $passwordPath)) {
+    throw 'Encrypted backup credential is missing.'
+}
 if (-not $Profile) { $Profile = $config.profile }
 $secure = Get-Content -Raw -LiteralPath $passwordPath | ConvertTo-SecureString
 $plain = [System.Net.NetworkCredential]::new('', $secure).Password

@@ -1,12 +1,33 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
     [string]$Repository,
+    [ValidateSet('Auto','Plain','Encrypted')]
+    [string]$BackupMode = 'Auto',
+    [string]$RemoteName = 'work-drive',
+    [string]$PlainRemotePath = 'Work System/00 Recovery/plain-foundation',
     [string]$Target = "$([Environment]::GetFolderPath('MyDocuments'))\WorkSystem-Restore-Staging",
     [switch]$Apply
 )
 
 $ErrorActionPreference = 'Stop'
+$configPath = Join-Path $env:LOCALAPPDATA 'WorkSystemRecovery\config.json'
+if ($BackupMode -eq 'Auto' -and (Test-Path -LiteralPath $configPath)) {
+    $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
+    if ($config.backup_mode -eq 'plain-rclone') {
+        $BackupMode = 'Plain'
+        $RemoteName = $config.remote_name
+        $PlainRemotePath = $config.remote_path
+    } else {
+        $BackupMode = 'Encrypted'
+        if (-not $Repository) { $Repository = $config.repository }
+    }
+}
+if ($BackupMode -eq 'Auto') { $BackupMode = if ($Repository) { 'Encrypted' } else { 'Plain' } }
+if ($BackupMode -eq 'Plain') {
+    & "$PSScriptRoot\Restore-WorkSystemPlain.ps1" -RemoteName $RemoteName -RemotePath $PlainRemotePath -Target $Target -Apply:$Apply
+    exit $LASTEXITCODE
+}
+if (-not $Repository) { throw 'Encrypted repository path is required.' }
 if (-not (Get-Command restic -ErrorAction SilentlyContinue)) { throw 'restic is not installed.' }
 $secure = Read-Host 'Enter the restic repository password' -AsSecureString
 $plain = [System.Net.NetworkCredential]::new('', $secure).Password

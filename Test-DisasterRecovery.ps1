@@ -2,12 +2,13 @@
 param(
     [string]$Repository,
     [string]$ExistingRestoreTarget,
-    [switch]$KeepRestore
+    [switch]$KeepRestore,
+    [switch]$SkipBackupHealth
 )
 
 $ErrorActionPreference = 'Stop'
 $stateRoot = Join-Path $env:LOCALAPPDATA 'WorkSystemRecovery'
-if (-not $Repository) {
+if (-not $Repository -and -not $ExistingRestoreTarget) {
     $configPath = Join-Path $stateRoot 'config.json'
     if (-not (Test-Path -LiteralPath $configPath)) { throw 'Production backup is not initialized.' }
     $Repository = (Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json).repository
@@ -39,8 +40,10 @@ if (-not $manifest) { throw 'Chat organization manifest is missing.' }
 $records = @((Get-Content -Raw -LiteralPath $manifest.FullName | ConvertFrom-Json).records)
 if ($records.Count -eq 0) { throw 'Chat organization manifest has no records.' }
 
-& "$PSScriptRoot\Test-WorkSystemBackupHealth.ps1"
-if ($LASTEXITCODE -ne 0) { throw 'Backup health validation failed.' }
+if (-not $SkipBackupHealth) {
+    & "$PSScriptRoot\Test-WorkSystemBackupHealth.ps1"
+    if ($LASTEXITCODE -ne 0) { throw 'Backup health validation failed.' }
+}
 
 [ordered]@{checked_at=(Get-Date).ToString('o');repository=$Repository;target=$target;required_markers=$required;chat_records=$records.Count;result='PASS'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $stateRoot 'last-restore-test.json') -Encoding utf8
 Write-Output "PASS: restored required operating notes and $($records.Count) chat records."

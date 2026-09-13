@@ -5,10 +5,18 @@
 ## Перший запуск резервування
 
 ```powershell
-.\Initialize-GoogleDriveFoundation.ps1 -RegisterSchedule
+.\Initialize-GoogleDriveFoundation.ps1 -BackupMode Plain -RegisterSchedule
 ```
 
-Перший запуск відкриє одноразову авторизацію Google Drive через `rclone`, а потім попросить пароль restic у захищеному prompt. Збережіть пароль у зовнішньому password manager: DPAPI-копія на поточній машині не є recovery copy. З параметром `-RegisterSchedule` команда також реєструє щоденний backup о 02:00 і щоденне очищення verified scratch о 03:00 після 7 днів retention.
+Типовий режим `Plain` відкриє одноразову авторизацію Google Drive через `rclone`, перенесе Foundation у `Work System/00 Recovery/plain-foundation`, перевірить marker readback і зареєструє щоденне резервування о 02:00. Окремого пароля резервної копії немає. Дані захищає обліковий запис Google, HTTPS під час передачі та стандартне шифрування Google Drive.
+
+Для окремо зашифрованого архіву використовуйте:
+
+```powershell
+.\Initialize-GoogleDriveFoundation.ps1 -BackupMode Encrypted -RegisterSchedule
+```
+
+`Encrypted` використовує restic і вимагає незалежно збережену парольну фразу. Restic не підтримує незашифрований режим; `Plain` реалізований окремим рушієм `rclone`.
 
 ## Ручний backup
 
@@ -24,13 +32,13 @@
 Install-WorkSystem.cmd
 ```
 
-Це one-command launcher. Google OAuth/MFA, вхід у Codex, підтвердження Syncthing device і незалежно збережений restic passphrase залишаються обов'язковими безпечними prompt.
+Це one-command launcher. У типовому режимі `Plain` потрібні лише Google OAuth/MFA та вхід у Codex. Підтвердження Syncthing потрібне лише якщо live-репліка ввімкнена додатково. Пароль restic потрібен лише для `Encrypted`.
 
 ```powershell
-.\bootstrap.ps1 -Repository "rclone:work-drive:Work System/00 Recovery/restic-foundation" -Apply
+.\bootstrap.ps1 -BackupMode Plain -Apply
 ```
 
-Перший вхід у Codex/ChatGPT, Google OAuth/MFA, ключ restic і підтвердження Syncthing device виконуються вручну. Скрипти не зберігають access tokens або паролі у репозиторії.
+Перший вхід у Codex/ChatGPT і Google OAuth/MFA виконуються вручну. Скрипти не зберігають access tokens або паролі у репозиторії.
 
 ## Профілі
 
@@ -48,7 +56,23 @@ Install-WorkSystem.cmd
 - PDF, ZIP, DOCX, XLSX, зображення та інші бінарні результати спочатку формуються у `%LOCALAPPDATA%\WorkSystemScratch`, потім публікуються через `Publish-WorkArtifact.ps1`.
 - Після завантаження обов'язкові hash readback, Drive file ID/URL, запис у tracker `Files` і короткий опис/лінк в Obsidian.
 - `Clear-WorkSystemScratch.ps1 -WhatIf` показує майбутнє очищення. Видалення дозволене лише для файлів у канонічному scratch, старших за retention, із валідним `.published.json`, незмінним локальним MD5 і повторно підтвердженим remote MD5.
-- Вихідний код зберігається у Git; Drive містить release artifacts і зашифровані snapshots, а не замінює version control.
+- Вихідний код зберігається у Git; Drive містить release artifacts і Foundation backup, а не замінює version control.
+
+## Режими резервування
+
+- `Plain` (типовий): читабельна структура `current/Documents`, журнал змінених або видалених файлів у `history/<timestamp>` і перевірені markers у `manifests`. Найпростіше повне відновлення без окремого ключа.
+- `Encrypted`: історичні snapshots restic із клієнтським шифруванням. Сильніша конфіденційність, але без незалежної парольної фрази відновлення неможливе.
+- Обидва режими виключають кеші, залежності, тимчасові файли, OAuth tokens, cookies, локальні credentials і restic password files.
+
+## Перенесення під ключ
+
+1. На джерельній машині виконайте `.\Initialize-GoogleDriveFoundation.ps1 -BackupMode Plain -RegisterSchedule`.
+2. Дочекайтеся `PASS` і перевірте `.\Test-WorkSystemBackupHealth.ps1` та `.\Test-DisasterRecovery.ps1`.
+3. На новій машині завантажте pinned release, розпакуйте і запустіть `Install-WorkSystem.cmd`.
+4. Підтвердьте Google OAuth/MFA. Скрипт відновить Foundation у staging, перевірить контрольні нотатки й лише потім застосує її до `Documents`.
+5. Увійдіть у Codex, відкрийте Vault і виконайте `.\Repair-WorkSystem.ps1 -RepairSchedules -RunBackup -RunRestoreTest`.
+
+Для encrypted-варіанта перед `Install-WorkSystem.cmd` виконайте `set WORKSYSTEM_BACKUP_MODE=Encrypted`.
 
 ## Перевірка
 
@@ -56,7 +80,7 @@ Install-WorkSystem.cmd
 .\Test-WorkSystemRecovery.ps1
 ```
 
-Done означає тільки успішний `restic check`, тестове відновлення та перевірку контрольних файлів на іншому каталозі або чистій машині.
+Done означає тільки успішний health check вибраного рушія, тестове відновлення та перевірку контрольних файлів в іншому каталозі або на чистій машині.
 
 ## Repair and reusable deployment
 

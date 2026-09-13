@@ -17,7 +17,9 @@ function Register-DailyScriptTask {
     Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger -Settings $settings -Description $Description -Force | Out-Null
 }
 
-Register-DailyScriptTask -Name 'Work System Encrypted Backup' -Script (Join-Path $PSScriptRoot 'Invoke-WorkSystemBackup.ps1') -At $BackupTime -Arguments '' -Description 'Encrypted Foundation backup.'
+$legacyTask = Get-ScheduledTask -TaskName 'Work System Encrypted Backup' -ErrorAction SilentlyContinue
+if ($legacyTask) { Unregister-ScheduledTask -TaskName 'Work System Encrypted Backup' -Confirm:$false }
+Register-DailyScriptTask -Name 'Work System Foundation Backup' -Script (Join-Path $PSScriptRoot 'Invoke-WorkSystemBackup.ps1') -At $BackupTime -Arguments '' -Description 'Foundation backup using the configured plain or encrypted engine.'
 Register-DailyScriptTask -Name 'Work System Verified Scratch Cleanup' -Script (Join-Path $PSScriptRoot 'Clear-WorkSystemScratch.ps1') -At $CleanupTime -Arguments "-RetentionDays $ScratchRetentionDays" -Description 'Delete only Drive-verified scratch artifacts after retention.'
 Register-DailyScriptTask -Name 'Work System Backup Health' -Script (Join-Path $PSScriptRoot 'Test-WorkSystemBackupHealth.ps1') -At $HealthTime -Arguments '' -Description 'Fail when the latest verified snapshot is stale or unavailable.'
 

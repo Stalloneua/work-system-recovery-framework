@@ -2,6 +2,7 @@
 setlocal EnableExtensions
 
 set "REPOSITORY=rclone:work-drive:Work System/00 Recovery/restic-foundation"
+if not defined WORKSYSTEM_BACKUP_MODE set "WORKSYSTEM_BACKUP_MODE=Plain"
 
 where powershell.exe >nul 2>&1
 if errorlevel 1 (
@@ -10,8 +11,8 @@ if errorlevel 1 (
 )
 
 echo Starting Work System bootstrap.
-echo Secure Google sign-in and the independently stored recovery passphrase may be requested.
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0bootstrap.ps1" -Repository "%REPOSITORY%" -Apply
+echo Secure Google sign-in may be requested. Encrypted mode also requires the independent recovery passphrase.
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0bootstrap.ps1" -Repository "%REPOSITORY%" -BackupMode "%WORKSYSTEM_BACKUP_MODE%" -Apply
 set "RESULT=%ERRORLEVEL%"
 
 if not "%RESULT%"=="0" (

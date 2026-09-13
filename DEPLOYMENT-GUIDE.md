@@ -4,7 +4,7 @@
 
 This framework deploys and recovers a cloud-first work environment built around Codex, Obsidian, a central Google Sheets tracker, Google Drive artifacts, Git source repositories and reconstructable chat records. It is organization-agnostic: client-specific directories, IDs, access rules and source inventories are supplied through local configuration and are never committed to the reusable source repository.
 
-The target outcome is one technical command plus unavoidable secure account confirmations. No recovery design should bypass Google OAuth, MFA, Codex sign-in, Syncthing device approval or the independently stored backup passphrase.
+The target outcome is one technical command plus unavoidable secure account confirmations. The default `Plain` mode requires Google OAuth/MFA and Codex sign-in but no separate backup passphrase. Optional `Encrypted` mode also requires an independently stored restic passphrase.
 
 ## Sources of truth
 
@@ -15,14 +15,14 @@ The target outcome is one technical command plus unavoidable secure account conf
 | Google Docs, Sheets and Slides | Google Drive native files | Cloud-first documents |
 | PDF, DOCX, XLSX, ZIP and media deliverables | Google Drive file IDs | Durable binary artifacts after QA |
 | Source code | Git remote | Version control and clean-machine checkout |
-| Disaster recovery | Encrypted restic repository in Google Drive through rclone | Historical, independent snapshots |
+| Disaster recovery | Plain versioned Google Drive mirror by default; optional encrypted restic repository | Portable Foundation plus recoverable history |
 | Chat and project organization | Tracker, Obsidian and chat-organization manifest | Reconstructs context even when sidebar UI differs |
 
-## Security model
+## Backup modes and security model
 
-- The restic passphrase is never stored in Git, Obsidian, the tracker or a Drive document.
-- The scheduled task receives a Windows DPAPI-encrypted local copy, which works only for the same Windows user and machine.
-- A separate recovery copy must exist in a password manager or another controlled offline location.
+- `Plain` stores readable files under `Work System/00 Recovery/plain-foundation/current`, changed or deleted files under timestamped `history`, and verified completion markers under `manifests`. There is no separate recovery passphrase.
+- Google protects `Plain` data in transit and at rest, but any account with Drive access can read it. Use least-privilege sharing and MFA.
+- `Encrypted` uses restic. Its passphrase is never stored in Git, Obsidian, the tracker or a Drive document. The scheduled task receives a Windows DPAPI-encrypted local copy, and an independent recovery copy must exist in a password manager.
 - OAuth tokens stay in the local rclone configuration and are recreated by sign-in on a replacement machine.
 - Reconstructable records avoid unnecessary personal data and secrets.
 
@@ -35,11 +35,11 @@ The target outcome is one technical command plus unavoidable secure account conf
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\Initialize-GoogleDriveFoundation.ps1 -RegisterSchedule
+.\Initialize-GoogleDriveFoundation.ps1 -BackupMode Plain -RegisterSchedule
 ```
 
 5. Approve Google OAuth in the browser.
-6. Enter a restic passphrase of at least 16 characters and store its recovery copy outside the computer.
+6. For `Encrypted` only, enter a restic passphrase of at least 16 characters and store its recovery copy outside the computer.
 7. Verify:
 
 ```powershell
@@ -64,14 +64,14 @@ The launcher requests Administrator elevation, installs Windows OpenSSH Server i
 
 | Task | Default | Result |
 |---|---|---|
-| Work System Encrypted Backup | Daily 02:00 | Encrypted Foundation snapshot |
+| Work System Foundation Backup | Daily 02:00 | Foundation backup using the configured Plain or Encrypted engine |
 | Work System Verified Scratch Cleanup | Daily 03:00 | Removes only published and remotely verified scratch artifacts after retention |
 | Work System Backup Health | Daily 06:00 | Fails if the newest snapshot is unavailable or older than 30 hours |
 | Work System Backup Maintenance | Sunday 04:00 | Keeps 14 daily, 8 weekly and 12 monthly snapshots, prunes and checks the repository |
 
 ## Clean-machine recovery
 
-Prerequisites: Windows, network access, the repository path and the independently stored restic passphrase.
+Prerequisites: Windows and network access. `Encrypted` additionally requires the repository path and independently stored restic passphrase.
 
 After downloading and verifying the pinned release package, run one command from its extracted directory:
 
@@ -79,16 +79,16 @@ After downloading and verifying the pinned release package, run one command from
 Install-WorkSystem.cmd
 ```
 
-The launcher calls the pinned `bootstrap.ps1` with the canonical Google Drive restic repository. Account sign-ins, MFA, Syncthing device approval and the independently stored passphrase are secure confirmations, not extra deployment commands.
+The launcher calls the pinned `bootstrap.ps1` in default `Plain` mode. Google OAuth/MFA and Codex sign-in remain secure confirmations, not extra deployment commands. Set `WORKSYSTEM_BACKUP_MODE=Encrypted` before launch only when restoring a restic backup.
 
 From the framework directory run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
-.\bootstrap.ps1 -Repository "rclone:work-drive:Work System/00 Recovery/restic-foundation" -Apply
+.\bootstrap.ps1 -BackupMode Plain -Apply
 ```
 
-The script installs Git, Codex, Obsidian, Syncthing, restic and rclone when missing; requests Google OAuth; restores the latest snapshot to staging; validates required recovery markers; and applies the restored Documents tree only after validation.
+The script installs Git, Codex, Obsidian, Syncthing and rclone when missing; installs restic only for `Encrypted`; requests Google OAuth; restores the latest Foundation to staging; validates required recovery markers; and applies the restored Documents tree only after validation.
 
 After the command:
 
@@ -111,6 +111,16 @@ After the command:
 
 ### Repository is unavailable
 
+For `Plain`:
+
+```powershell
+rclone listremotes
+rclone lsd work-drive:
+rclone cat "work-drive:Work System/00 Recovery/plain-foundation/latest.json"
+```
+
+For `Encrypted`:
+
 ```powershell
 rclone listremotes
 rclone lsd work-drive:
@@ -132,7 +142,7 @@ Only purge reinstallable dependencies, caches, crash dumps and files inside `%LO
 Restore into a new staging directory first:
 
 ```powershell
-.\Restore-WorkSystem.ps1 -Repository "rclone:work-drive:Work System/00 Recovery/restic-foundation"
+.\Restore-WorkSystem.ps1 -BackupMode Plain
 ```
 
 Compare and validate before using `-Apply`. Never overwrite the live environment directly from an unverified snapshot.
@@ -153,7 +163,7 @@ Compare and validate before using `-Apply`. Never overwrite the live environment
 
 - The latest snapshot is no more than 30 hours old.
 - At least three historical snapshots exist after the initial operating period.
-- `restic check` passes.
+- The configured engine health check passes; `Encrypted` additionally requires `restic check`.
 - A clean-directory restore contains every required operating note and a non-empty chat manifest.
 - A replacement machine can restore the Vault and continue one selected task from its last checkpoint.
 - Google-native documents remain linked by stable Drive ID.
