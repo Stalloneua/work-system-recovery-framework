@@ -24,6 +24,20 @@
 .\Invoke-WorkSystemBackup.ps1
 ```
 
+Коли rclone тимчасово не може записувати через квоту спільного OAuth-проєкту, агент може сформувати повністю сумісний локальний staging-знімок для завантаження через авторизований Google Drive connector:
+
+```cmd
+node Export-WorkSystemPlainSnapshot.mjs --profile Foundation
+```
+
+Еквівалентна PowerShell-команда викликає той самий перевірений експортер:
+
+```powershell
+.\Export-WorkSystemPlainSnapshot.ps1 -Profile Foundation
+```
+
+Знімок створюється лише всередині `%LOCALAPPDATA%\WorkSystemScratch\ConnectorSnapshots`; кожен об'єкт обмежений 80 MiB для connector-safe upload. Після завантаження всіх архівів і `manifest.json`, перевірки віддалених назв/розмірів та публікації `latest-connector.json` він відновлюється штатним `Restore-WorkSystemPlain.ps1`. Restore і health-check вибирають найновіший валідний маркер між `latest-connector.json` та історичним `latest.json`.
+
 ## Відновлення на чистій машині
 
 Після завантаження і перевірки pinned release виконайте одну команду з розпакованого каталогу:
@@ -89,6 +103,7 @@ Done означає тільки успішний health check вибраног�
 - `Repair-WorkSystem.ps1` діагностує інструменти, вільне місце, конфігурацію та заплановані задачі.
 - `Invoke-WorkSystemMaintenance.ps1` застосовує retention, prune і `restic check`.
 - `DEPLOYMENT-GUIDE.md` є універсальною інструкцією для власного середовища або адаптації під клієнта.
+- `starter-thread-manifest.json` описує основні continuation-чати через канонічні DIR/PRJ/TSK, checkpoint і джерела істини. `node Initialize-StarterThreads.mjs` створює відсутні чати в режимі `read-only` та веде локальний ідемпотентний registry у `%LOCALAPPDATA%\WorkSystemRecovery`.
 
 ## Підготовка Windows-машини для віддаленого Codex
 

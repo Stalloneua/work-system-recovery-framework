@@ -50,6 +50,16 @@ Set-ExecutionPolicy -Scope Process Bypass
 
 The deployment is accepted only when all three checks pass and a clean-directory restore contains the operating notes, direction register and chat manifest.
 
+### Connector fallback when rclone cannot write
+
+If the shared rclone OAuth project is rate-limited, build the same restore-compatible Foundation snapshot for upload through an authorized Google Drive connector:
+
+```powershell
+.\Export-WorkSystemPlainSnapshot.ps1 -Profile Foundation
+```
+
+The command delegates to the Node exporter, writes only under `%LOCALAPPDATA%\WorkSystemScratch\ConnectorSnapshots`, and splits large payloads into connector-safe 80 MiB volumes. Upload every archive part and `manifest.json` to one immutable snapshot folder, verify the remote file names and sizes, then publish `latest-connector.json`. The snapshot is current only after a clean-directory `Restore-WorkSystemPlain.ps1` run returns `PASS`. The restore, health and maintenance scripts select the newest valid marker between `latest-connector.json` and `latest.json`.
+
 ## Optional remote Windows host bootstrap
 
 To make a Windows workstation manageable from Codex without exposing credentials, generate an ED25519 key on the controlling machine and run the following from the framework directory on the target:
@@ -100,6 +110,18 @@ After the command:
 6. Recreate local secrets from the password manager.
 7. Run `Repair-WorkSystem.ps1 -RepairSchedules -RunBackup -RunRestoreTest`.
 
+### Restore continuation chats and sidebar structure
+
+After Codex sign-in and Foundation restore, create the canonical continuation chats once:
+
+```cmd
+node Initialize-StarterThreads.mjs
+```
+
+The initializer is idempotent and records created thread IDs in `%LOCALAPPDATA%\WorkSystemRecovery\starter-thread-registry.json`. Each chat starts in read-only mode with its canonical `DIR`, `PRJ`, related `TSK`, source-of-truth references, last verified checkpoint and next action. It must not execute project work during initialization.
+
+In the Codex app, create the six canonical sidebar sections from the direction register, apply each title from `starter-thread-manifest.json`, and move each created thread to its matching `direction_id`. This app-level organization is a post-restore agent action because the local CLI creates threads but does not own sidebar metadata. Verify all registry thread IDs by reading them back from the target host before declaring the migration complete.
+
 ## Repair playbook
 
 ### Backup did not run
@@ -116,6 +138,7 @@ For `Plain`:
 ```powershell
 rclone listremotes
 rclone lsd work-drive:
+rclone cat "work-drive:Work System/00 Recovery/plain-foundation/latest-connector.json"
 rclone cat "work-drive:Work System/00 Recovery/plain-foundation/latest.json"
 ```
 

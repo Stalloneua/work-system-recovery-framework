@@ -8,13 +8,21 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not (Get-Command rclone -ErrorAction SilentlyContinue)) { throw 'rclone is not installed.' }
-$sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
-if (-not $sevenZip) { $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
+$sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+if (-not (Test-Path -LiteralPath $sevenZip)) {
+    $sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+}
 if (-not (Test-Path -LiteralPath $sevenZip)) { throw '7-Zip is not installed.' }
 $remoteRoot = "${RemoteName}:$($RemotePath.Trim('/'))"
-$markerJson = & rclone cat "$remoteRoot/latest.json" --log-level ERROR
-if ($LASTEXITCODE -ne 0) { throw 'Cannot read the plain backup marker.' }
-$marker = $markerJson | ConvertFrom-Json
+$markerCandidates = @()
+foreach ($markerName in @('latest-connector.json','latest.json')) {
+    $markerJson = & rclone cat "$remoteRoot/$markerName" --log-level ERROR 2>$null
+    if ($LASTEXITCODE -eq 0 -and $markerJson) {
+        try { $markerCandidates += ($markerJson | ConvertFrom-Json) } catch {}
+    }
+}
+if ($markerCandidates.Count -eq 0) { throw 'Cannot read a plain backup marker.' }
+$marker = $markerCandidates | Sort-Object { [DateTimeOffset]$_.created_at } -Descending | Select-Object -First 1
 if ($marker.backup_mode -ne 'plain-rclone' -or $marker.layout -ne 'snapshot-archives' -or -not $marker.backup_id) {
     throw 'Invalid or unsupported plain backup marker.'
 }
@@ -31,8 +39,15 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Cannot download $($entry.archive)" }
         $sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $archivePath).Hash
         if ($sha256 -ne $entry.sha256) { throw "SHA256 mismatch for $($entry.archive)" }
+    }
+
+    $extractTargets = @($marker.archives | ForEach-Object {
+        if ($_.extract_from) { $_.extract_from } else { $_.archive }
+    } | Select-Object -Unique)
+    foreach ($archiveName in $extractTargets) {
+        $archivePath = Join-Path $downloadRoot $archiveName
         & $sevenZip x $archivePath "-o$restoredDocuments" -y
-        if ($LASTEXITCODE -ne 0) { throw "Cannot extract $($entry.archive)" }
+        if ($LASTEXITCODE -ne 0) { throw "Cannot extract $archiveName" }
     }
 
     $vault = Get-ChildItem -LiteralPath $Target -Filter 'Work Management System.md' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1

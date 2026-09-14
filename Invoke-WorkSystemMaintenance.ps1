@@ -18,11 +18,15 @@ $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
 if ($config.backup_mode -eq 'plain-rclone') {
     $remoteRoot = "{0}:{1}" -f $config.remote_name, $config.remote_path.Trim('/')
     $cutoff = (Get-Date).AddDays(-$KeepPlainDays)
-    $latestId = $null
-    $latestJson = & rclone cat "$remoteRoot/latest.json" --log-level ERROR 2>$null
-    if ($LASTEXITCODE -eq 0 -and $latestJson) {
-        $latestId = ($latestJson | ConvertFrom-Json).backup_id
+    $markerCandidates = @()
+    foreach ($markerName in @('latest-connector.json','latest.json')) {
+        $latestJson = & rclone cat "$remoteRoot/$markerName" --log-level ERROR 2>$null
+        if ($LASTEXITCODE -eq 0 -and $latestJson) {
+            try { $markerCandidates += ($latestJson | ConvertFrom-Json) } catch {}
+        }
     }
+    if ($markerCandidates.Count -eq 0) { throw 'Cannot read a plain backup marker.' }
+    $latestId = ($markerCandidates | Sort-Object { [DateTimeOffset]$_.created_at } -Descending | Select-Object -First 1).backup_id
     $directories = @(& rclone lsf "$remoteRoot/snapshots" --dirs-only --log-level ERROR 2>$null)
     if ($LASTEXITCODE -notin @(0,3)) { throw 'Cannot list plain backup snapshots.' }
     $removed = [System.Collections.Generic.List[string]]::new()

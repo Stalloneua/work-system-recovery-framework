@@ -11,9 +11,15 @@ if (-not (Test-Path -LiteralPath $configPath)) { throw 'Production backup is not
 $config = Get-Content -Raw -LiteralPath $configPath | ConvertFrom-Json
 if ($config.backup_mode -eq 'plain-rclone') {
     $remoteRoot = "{0}:{1}" -f $config.remote_name, $config.remote_path.Trim('/')
-    $json = & rclone cat "$remoteRoot/latest.json" --log-level ERROR
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot read the plain backup marker.' }
-    $latest = $json | ConvertFrom-Json
+    $markerCandidates = @()
+    foreach ($markerName in @('latest-connector.json','latest.json')) {
+        $json = & rclone cat "$remoteRoot/$markerName" --log-level ERROR 2>$null
+        if ($LASTEXITCODE -eq 0 -and $json) {
+            try { $markerCandidates += ($json | ConvertFrom-Json) } catch {}
+        }
+    }
+    if ($markerCandidates.Count -eq 0) { throw 'Cannot read a plain backup marker.' }
+    $latest = $markerCandidates | Sort-Object { [DateTimeOffset]$_.created_at } -Descending | Select-Object -First 1
     $age = [DateTimeOffset]::Now - [DateTimeOffset]$latest.created_at
     $status = if ($age.TotalHours -le $MaxAgeHours) { 'healthy' } else { 'stale' }
     [ordered]@{checked_at=(Get-Date).ToString('o');status=$status;backup_mode='plain-rclone';latest_backup=$latest.backup_id;backup_time=$latest.created_at;age_hours=[math]::Round($age.TotalHours,2);max_age_hours=$MaxAgeHours;repository=$remoteRoot} | ConvertTo-Json | Set-Content -LiteralPath $healthPath -Encoding utf8
