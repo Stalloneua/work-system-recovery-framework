@@ -1,7 +1,8 @@
 [CmdletBinding()]
-param([string]$OutputDirectory = "$PSScriptRoot\dist")
+param([string]$OutputDirectory)
 
 $ErrorActionPreference = 'Stop'
+if (-not $OutputDirectory) { $OutputDirectory = Join-Path $PSScriptRoot 'dist' }
 & "$PSScriptRoot\New-ChatOrganizationManifest.ps1" | Out-Null
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
